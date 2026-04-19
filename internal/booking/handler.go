@@ -21,6 +21,62 @@ type holdSeatRequest struct {
 	UserID string `json:"user_id"`
 }
 
+func (h *Handler) ConfirmSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionID")
+
+	var req holdSeatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		return
+	}
+
+	if req.UserID == "" {
+		return
+	}
+
+	session, err := h.srv.ConfirmSeat(r.Context(), sessionID, req.UserID)
+	if err != nil {
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusOK, sessionResponse{
+		SessionID: session.ID,
+		MovieID:   session.MovieID,
+		SeatID:    session.SeatID,
+		UserID:    req.UserID,
+		Status:    session.Status,
+	})
+}
+
+type sessionResponse struct {
+	SessionID string `json:"session_id"`
+	MovieID   string `json:"movie_id"`
+	SeatID    string `json:"seat_id"`
+	UserID    string `json:"user_id"`
+	Status    string `json:"status"`
+	ExpiresAt string `json:"expires_at,omitempty"`
+}
+
+func (h *Handler) ReleaseSession(w http.ResponseWriter, r *http.Request) {
+	sessionID := r.PathValue("sessionID")
+
+	var req holdSeatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Println(err)
+		return
+	}
+	if req.UserID == "" {
+		return
+	}
+
+	err := h.srv.ReleaseSeat(r.Context(), sessionID, req.UserID)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) HoldSeat(w http.ResponseWriter, r *http.Request) {
 	movieID := r.PathValue("movieID")
 	seatID := r.PathValue("seatID")

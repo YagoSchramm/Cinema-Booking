@@ -20,16 +20,14 @@ type RedisStore struct {
 func NewRedisStore(rdb *redis.Client) *RedisStore {
 	return &RedisStore{rdb: rdb}
 }
-func sessionKey(id string) string {
-	return fmt.Sprintf("session:%s", id)
-}
-func (rs *RedisStore) Book(b Booking) error {
+
+func (rs *RedisStore) Book(b Booking) (Booking, error) {
 	session, err := rs.hold(b)
 	if err != nil {
-		return err
+		return Booking{}, err
 	}
 	log.Printf("Session Booked %v", session)
-	return nil
+	return session, nil
 }
 func (rs *RedisStore) ListBookings(movieID string) []Booking {
 	pattern := fmt.Sprintf("seat:%s:*", movieID)
@@ -51,6 +49,52 @@ func (rs *RedisStore) ListBookings(movieID string) []Booking {
 	}
 
 	return sessions
+}
+func (rs *RedisStore) Confirm(ctx context.Context, sessionID string, userID string) (Booking, error) {
+	session, sk, err := rs.getSession(ctx, sessionID, userID)
+	if err != nil {
+		return Booking{}, err
+	}
+	rs.rdb.Persist(ctx, sk)
+	rs.rdb.Persist(ctx, sessionKey(sessionID))
+	session.Status = "confirmed"
+	data := Booking{
+		ID:      session.ID,
+		MovieID: string(session.MovieID),
+		SeatID:  session.SeatID,
+		UserID:  session.UserID,
+		Status:  "confirmed",
+	}
+	val, _ := json.Marshal(data)
+	rs.rdb.Set(ctx, sk, val, 0)
+	return session, err
+}
+func (rs *RedisStore) Release(ctx context.Context, sessionID string, userID string) error {
+	_, sk, err := rs.getSession(ctx, sessionID, userID)
+	if err != nil {
+		return err
+	}
+	rs.rdb.Del(ctx, sk, sessionKey(sessionID))
+	return nil
+}
+func sessionKey(id string) string {
+	return fmt.Sprintf("session:%s", id)
+}
+func (rs *RedisStore) getSession(ctx context.Context, sessionID string, userID string) (Booking, string, error) {
+	sk, err := rs.rdb.Get(ctx, sessionKey(sessionID)).Result()
+	if err != nil {
+		return Booking{}, "", err
+	}
+	val, err := rs.rdb.Get(ctx, sk).Result()
+	if err != nil {
+		return Booking{}, "", err
+	}
+	session, err := parseSession(val)
+	if err != nil {
+		return Booking{}, "", err
+	}
+	return session, sk, err
+
 }
 func (rs *RedisStore) hold(b Booking) (Booking, error) {
 	id := uuid.NewString()
