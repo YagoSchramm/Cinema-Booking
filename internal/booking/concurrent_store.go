@@ -10,20 +10,20 @@ type ConcurrentStore struct {
 func NewConcurrentStore() *ConcurrentStore {
 	return &ConcurrentStore{bookings: map[string]Booking{}}
 }
-func (ms *ConcurrentStore) Book(b Booking) error {
-	ms.Lock()
-	defer ms.Unlock()
-	if _, exists := ms.bookings[b.SeatID]; exists {
+func (cs *ConcurrentStore) Book(b Booking) error {
+	cs.Lock()
+	defer cs.Unlock()
+	if _, exists := cs.bookings[b.SeatID]; exists {
 		return OcuppedSeatError
 	}
-	ms.bookings[b.ID] = b
+	cs.bookings[b.ID] = b
 	return nil
 }
-func (ms *ConcurrentStore) ListBookings(movieID string) []Booking {
-	ms.RLock()
-	defer ms.RUnlock()
+func (cs *ConcurrentStore) ListBookings(movieID string) []Booking {
+	cs.RLock()
+	defer cs.RUnlock()
 	var bookings []Booking
-	for _, book := range ms.bookings {
+	for _, book := range cs.bookings {
 		if movieID == book.MovieID {
 			bookings = append(bookings, book)
 		}
