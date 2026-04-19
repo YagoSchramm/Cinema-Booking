@@ -641,24 +641,16 @@
             timerInterval = null;
           }
         }
-
-        // --- Polling ---
-
         function startPolling() {
           if (pollInterval) clearInterval(pollInterval);
           pollInterval = setInterval(fetchSeats, 2000);
         }
-
-        // --- Util ---
 
         function escapeHtml(str) {
           var div = document.createElement("div");
           div.textContent = str;
           return div.innerHTML;
         }
-
-        // --- Init ---
-
         loadMovies();
       })();
     </script>
